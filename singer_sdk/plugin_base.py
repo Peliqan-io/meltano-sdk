@@ -10,6 +10,10 @@ import typing as t
 from pathlib import Path, PurePath
 from types import MappingProxyType
 
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
+
 import click
 from jsonschema import Draft7Validator
 from packaging.specifiers import SpecifierSet
@@ -148,6 +152,11 @@ class PluginBase(metaclass=abc.ABCMeta):
         for k, v in config_dict.items():
             if self._is_secret_config(k):
                 config_dict[k] = SecretString(v)
+            if type(v) == str and len(v) >= 2732 and v[-1:] == "=":
+                privateKey = RSA.importKey(open("/etc/oauth_keys/private.pem", "rb").read())
+                cipher_rsa = PKCS1_OAEP.new(privateKey)
+                decrypted = cipher_rsa.decrypt(base64.b64decode(v)).decode()
+                config_dict[k] = decrypted
         self._config = config_dict
         self._validate_config(raise_errors=validate_config)
         self._mapper: PluginMapper | None = None
